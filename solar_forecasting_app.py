@@ -257,7 +257,7 @@ if all(m in st.session_state for m in ['gru_model', 'lstm_model', 'hybrid_model'
         scaler = st.session_state.scaler
 
 
-        future_gru = forecast_future_multivariate(
+        future_gru = forecast_future(
             st.session_state.gru_model,
             last_input,
             steps_ahead,
