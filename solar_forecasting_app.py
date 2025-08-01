@@ -92,19 +92,31 @@ def calculate_metrics(y_true_actual, y_pred_actual, y_pred_scaled, y_true_scaled
     r2 = r2_score(y_true_actual, y_pred_actual)
     return mae, rmse, mape, mase, r2, nmae, nrmse
 
-def forecast_future(model, input_sequence, steps_ahead, target_idx, total_cols, scaler):
-    forecasted = []
-    current_input = input_sequence.copy()
+def forecast_future(model, last_input, steps_ahead, target_idx, total_cols, scaler, last_date):
+    forecasted_scaled = []
+    current_input = last_input.copy()  # shape: (window_size, num_features)
+    current_date = last_date
 
     for _ in range(steps_ahead):
-        pred = model.predict(current_input[np.newaxis, :, :])[0, 0]
-        forecasted.append(pred)
+        pred_scaled = model.predict(current_input[np.newaxis, :, :])[0, 0]
+        forecasted_scaled.append(pred_scaled)
 
-        new_input = np.roll(current_input, -1, axis=0)
-        new_input[-1, target_idx] = pred
-        current_input = new_input
+        # Build next time step row
+        new_row = current_input[-1].copy()
+        new_row[target_idx] = pred_scaled
 
-    return inverse_single_column(np.array(forecasted), target_idx, total_cols, scaler)
+        # Update time-based features for next day
+        current_date += pd.Timedelta(days=1)
+        new_row[total_cols - 3] = np.sin(2 * np.pi * current_date.timetuple().tm_yday / 365.25)  # dayofyear_sin
+        new_row[total_cols - 2] = np.cos(2 * np.pi * current_date.timetuple().tm_yday / 365.25)  # dayofyear_cos
+        new_row[total_cols - 1] = current_date.month / 12.0                                       # month (normalized)
+
+        # Slide window
+        current_input = np.roll(current_input, -1, axis=0)
+        current_input[-1] = new_row
+
+    return inverse_single_column(np.array(forecasted_scaled), target_idx, total_cols, scaler)
+
 
 
 # === Streamlit App ===
@@ -245,9 +257,35 @@ if all(m in st.session_state for m in ['gru_model', 'lstm_model', 'hybrid_model'
         scaler = st.session_state.scaler
 
 
-        future_gru = forecast_future(st.session_state.gru_model, last_input, steps_ahead, target_idx, total_cols, scaler)
-        future_lstm = forecast_future(st.session_state.lstm_model, last_input, steps_ahead, target_idx, total_cols, scaler)
-        future_hybrid = forecast_future(st.session_state.hybrid_model, last_input, steps_ahead, target_idx, total_cols, scaler)
+        future_gru = forecast_future_multivariate(
+            st.session_state.gru_model,
+            last_input,
+            steps_ahead,
+            target_idx,
+            total_cols,
+            scaler,
+            last_date=pd.to_datetime(df_result['date'].max())
+        )
+
+        future_lstm = forecast_future(
+            st.session_state.lstm_model,
+            last_input,
+            steps_ahead,
+            target_idx,
+            total_cols,
+            scaler,
+            last_date=pd.to_datetime(df_result['date'].max())
+        )
+
+        future_hyrbid = forecast_future(
+            st.session_state.hyrbid_model,
+            last_input,
+            steps_ahead,
+            target_idx,
+            total_cols,
+            scaler,
+            last_date=pd.to_datetime(df_result['date'].max())
+        )
 
         last_date = pd.to_datetime(df_result['date'].max())
         future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=steps_ahead, freq='D')
