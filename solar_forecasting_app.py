@@ -241,8 +241,9 @@ else:
     st.info("Please upload your CSV dataset or load a forecast report to begin.")
 
 # === Forecast next 1 year (8760 steps) ===
-if all(m in st.session_state for m in ['gru_model', 'lstm_model', 'hybrid_model']):
-    st.subheader("📅 Forecast Next Year (All Models)")
+required_keys = ['gru_model', 'lstm_model', 'hybrid_model', 'X_test', 'target_idx', 'total_cols', 'scaler', 'df_result']
+if all(k in st.session_state for k in required_keys):
+    st.subheader("📅 Forecast Future (All Models)")
 
     if st.button("📈 Generate 1-Year Forecast (GRU, LSTM, Hybrid)"):
         steps_ahead = 365  # ✅ for daily data
