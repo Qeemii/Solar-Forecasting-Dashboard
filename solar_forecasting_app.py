@@ -92,7 +92,7 @@ def calculate_metrics(y_true_actual, y_pred_actual, y_pred_scaled, y_true_scaled
     r2 = r2_score(y_true_actual, y_pred_actual)
     return mae, rmse, mape, mase, r2, nmae, nrmse
 
-def forecast_future(model, last_input, steps_ahead, target_idx, total_cols, scaler, last_date):
+def forecast_future_multivariate(model, last_input, steps_ahead, target_idx, total_cols, scaler, last_date):
     forecasted_scaled = []
     current_input = last_input.copy()  # shape: (window_size, num_features)
     current_date = last_date
@@ -116,8 +116,6 @@ def forecast_future(model, last_input, steps_ahead, target_idx, total_cols, scal
         current_input[-1] = new_row
 
     return inverse_single_column(np.array(forecasted_scaled), target_idx, total_cols, scaler)
-
-
 
 # === Streamlit App ===
 st.set_page_config(page_title="Train & Visualize Solar Forecast", layout="wide")
@@ -257,34 +255,32 @@ if all(m in st.session_state for m in ['gru_model', 'lstm_model', 'hybrid_model'
         scaler = st.session_state.scaler
 
 
-        future_gru = forecast_future(
-            st.session_state.gru_model,
-            last_input,
-            steps_ahead,
-            target_idx,
-            total_cols,
-            scaler,
-            last_date=pd.to_datetime(df_result['date'].max())
+        future_gru = forecast_future_multivariate(
+          st.session_state.gru_model,
+          last_input,
+          steps_ahead,
+          target_idx,
+          total_cols,
+          scaler,
+          last_date=pd.to_datetime(df_result['date'].max())
         )
-
-        future_lstm = forecast_future(
-            st.session_state.lstm_model,
-            last_input,
-            steps_ahead,
-            target_idx,
-            total_cols,
-            scaler,
-            last_date=pd.to_datetime(df_result['date'].max())
+        future_lstm = forecast_future_multivariate(
+          st.session_state.lstm_model,
+          last_input,
+          steps_ahead,
+          target_idx,
+          total_cols,
+          scaler,
+          last_date=pd.to_datetime(df_result['date'].max())
         )
-
-        future_hyrbid = forecast_future(
-            st.session_state.hyrbid_model,
-            last_input,
-            steps_ahead,
-            target_idx,
-            total_cols,
-            scaler,
-            last_date=pd.to_datetime(df_result['date'].max())
+        future_hybrid = forecast_future_multivariate(
+          st.session_state.hybrid_model,
+          last_input,
+          steps_ahead,
+          target_idx,
+          total_cols,
+          scaler,
+          last_date=pd.to_datetime(df_result['date'].max())
         )
 
         last_date = pd.to_datetime(df_result['date'].max())
@@ -318,4 +314,3 @@ if all(m in st.session_state for m in ['gru_model', 'lstm_model', 'hybrid_model'
         st.plotly_chart(fig_future, use_container_width=True)
 else:
     st.warning("⚠️ Please train all models first before running 1-year forecast.")
-
